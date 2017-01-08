@@ -43,9 +43,10 @@ echo "==- ${green}Enumeration by ${red}ded_sn0${der} -=="
 
 function snmp {
 	echo "[*] Running snmpwalk against v1 SNMP"
-	if (dosnmpwalk 1); then
+
+	if ! dosnmpwalk 1 ; then
 		echo "[*] v1 SNMP failed, so trying v2"
-		if (dosnmpwalk 2); then 
+		if ! dosnmpwalk 2c ; then 
 			echo "[*] v2 also failed (may be v3)"
 		else 
 			checksnmp 2
@@ -61,11 +62,11 @@ function checksnmp {
 }
 
 function dosnmpwalk {
-	report=$(snmpwalk -v $1 -c public $target)
-	if [ "$report" -eq  "snmpwalk: Timeout" ]; then
+	report="$(snmpwalk -v $1 -c public $target)"
+	if [ "$report" ==  "snmpwalk: Timeout" ]; then
 		return 1
 	else
-		echo "[*]  ${green}Check snmpwalk-$1.txt"
+		echo "[*]  ${green}Check snmpwalk-$1.txt${der}"
 		echo "$report" > snmpwalk-$1.txt
 		return 0
 	fi
@@ -107,32 +108,32 @@ function hydra_attack {
 
 function samba {
 
-	echo "[*] -Running enum4linux"
-	e4l="$(enum4linux $target)"
+	echo "[*] Running enum4linux"
+	e4l="$(enum4linux $target 2>&1)"
 	echo "$e4l" > smb-enum4linux.txt
-	echo "[*] -Complete. ${green}Check enum4linux.txt${der}"
+	echo "[*]  ${green}Check enum4linux.txt${der}"
 	## OS info 
 	os="$(echo "$e4l" |grep "Got OS info for $target from smbclient" |cut -d" " -f9-)"
 	if [ -n "$os" ]; then echo "[*]  ${red}$os${der}"; fi
-	echo "[*] -Running nmap smb-vuln* scripts"
+	echo "[*] Running nmap smb-vuln* scripts"
 	scan="$(nmap -p139,445 --script smb-vuln* $target)"
 	vuln="$(echo "$scan" | grep "CVE:" |cut -c17-)"
 	echo "$scan" > nmap-smb-vuln.txt
-	echo "[*] -Complete. ${green}Check nmap-smb-vuln.txt${der}"
+	echo "[*]  ${green}Check nmap-smb-vuln.txt${der}"
 	if [ -z "$vuln" ]; then 
-		echo "[*] -Nothing interesting noted (still check)"
+		echo "[*]  Nothing interesting noted (still check output)"
 	else
 		echo "[*]  ${red}$vuln${der}"
 	fi
-	echo "[*] -Running nmap smb-os-discovery script"
+	echo "[*] Running nmap smb-os-discovery script"
 	v="$(nmap -p139,445 --script smb-os-discovery $target)"
 	echo "$v" > nmap-smb-os-discovery.txt
-	echo "[*] -Complete. ${green}Check nmap-smb-os-discovery.txt${der}"
+	echo "[*]  ${green}Check nmap-smb-os-discovery.txt${der}"
 	os="$(echo "$v" |grep "OS:" |cut -d" " -f2-)"
 	if [ -z "$os" ]; then
 		echo "[*] -Nothing interesting noted (but still check)"
 	else
-		echo "[*]${red}$os${der}"
+		echo "[*]${red}Possible vulnerabilites: $os${der}"
 	fi
 }
 
