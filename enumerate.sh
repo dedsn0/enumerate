@@ -39,8 +39,7 @@ function ssh-known {
 }
 
 function ssh-brute {
-	echo "bruting"
-	#hydra_attack ssh $found_users $brute_passwords
+	hydra_attack ssh $found_users $brute_passwords
 }
 
 # generic hydra attack for credentials
