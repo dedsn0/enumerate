@@ -21,6 +21,8 @@ found_users=/root/lists/users.txt
 found_passwords=/root/lists/pass-reuse.txt
 brute_passwords=/usr/share/wordlists/rockyou.txt
 
+info_snmp=/root/lists/interest-snmp.txt
+
 #snmp_community=/root/lists/snmp-community.txt
 
 
@@ -48,17 +50,26 @@ function snmp {
 		echo "[*] v1 SNMP failed, so trying v2"
 		if ! dosnmpwalk 2c ; then 
 			echo "[*] v2 also failed (may be v3)"
-		else 
-			checksnmp 2
 		fi
-	else
-		checksnmp 1
 	fi 
 
 }
 
-function checksnmp {
-	echo "checking v$1"
+
+# $1 is the data & $2 is the info file
+function checkinfo {
+	while read info; do
+		search="$(echo "$info" |cut -d" " -f1)"
+		fields="$(echo "$info" |cut -d" " -f2)"
+		text="$(echo "$info" |cut -d" " -f3-)"
+
+		line="$(echo "$1" | grep "$search")"
+		
+		if [ -n "$line" ]; then
+			echo "[*]  ${red}${text}: $(echo "$line" | cut -d" " -f$fields)$der"
+		fi
+ 	done < $2
+
 }
 
 function dosnmpwalk {
@@ -68,6 +79,7 @@ function dosnmpwalk {
 	else
 		echo "[*]  ${green}Check snmpwalk-$1.txt${der}"
 		echo "$report" > snmpwalk-$1.txt
+		checkinfo "$report" "$info_snmp"
 		return 0
 	fi
 }
