@@ -11,6 +11,9 @@ tcp_services=("SSH Known Credentials" "SSH Brute Force" "SMB/Samba")
 tcp_port=("22" "22" "139 445")
 tcp_enumeration=("ssh-known" "ssh-brute" "samba")
 
+
+default_modules="ssh-known samba"
+
 found_users=/root/lists/users.txt
 found_passwords=/root/lists/pass-reuse.txt
 brute_passwords=/usr/share/wordlists/rockyou.txt
@@ -36,7 +39,8 @@ function ssh-known {
 }
 
 function ssh-brute {
-	hydra_attack ssh $found_users $brute_passwords
+	echo "bruting"
+	#hydra_attack ssh $found_users $brute_passwords
 }
 
 # generic hydra attack for credentials
@@ -223,15 +227,16 @@ if [ -z "$module" ]; then
 	##
 	## run all modules
 	##
-	echo "[*] Running all modules"
+	echo "[*] Running all default modules"
 	index=0
 	for service in ${tcp_enumeration[@]}; do
-		ports="${tcp_port[$index]}"
-		service="${tcp_services[$index]}"
-		funct="${tcp_enumeration[$index]}"
+		if [[ $default_modules == *$service* ]]; then 
+			ports="${tcp_port[$index]}"
+			service="${tcp_services[$index]}"
+			funct="${tcp_enumeration[$index]}"
 
-		enumerate_service "$service" "$ports" sS "$funct"
-
+			enumerate_service "$service" "$ports" sS "$funct"
+		fi
 		index=$(($index + 1))
 	done
 else
