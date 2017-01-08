@@ -1,0 +1,1 @@
+>:Server=\\[Samba 2.2.:1-:Likely vulnerable to trans2open buffer overflow

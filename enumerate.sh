@@ -8,7 +8,7 @@
 
 ## Services, ports and functions
 tcp_services=("SSH Known Credentials" "SSH Brute Force" "SMB/Samba" "Nmap TCP Top 200")
-tcp_port=("22" "22" "139 445" "")
+tcp_port=("22" "22" "139 445" "*")
 tcp_enumeration=("ssh-known" "ssh-brute" "samba" "nmap-tcp-200")
 
 udp_services=("SNMP")
@@ -22,15 +22,17 @@ found_passwords=/root/lists/pass-reuse.txt
 brute_passwords=/usr/share/wordlists/rockyou.txt
 
 info_snmp=/root/lists/interest-snmp.txt
+info_samba=/root/lists/interest-samba.txt
 
 #snmp_community=/root/lists/snmp-community.txt
 
 
 red="$(tput setaf 1)"
 green="$(tput setaf 2)"
+blue="$(tput setaf 4)"
 der="$(tput sgr0)"
 
-echo "==- ${green}Enumeration by ${red}ded_sn0${der} -=="
+echo "==- ${green}Enumeration${red} by ${blue}ded_sn0${der} -=="
 
 #########################################################################
 #
@@ -59,14 +61,15 @@ function snmp {
 # $1 is the data & $2 is the info file
 function checkinfo {
 	while read info; do
-		search="$(echo "$info" |cut -d" " -f1)"
-		fields="$(echo "$info" |cut -d" " -f2)"
-		text="$(echo "$info" |cut -d" " -f3-)"
-
+		delim="$(echo "$info" | cut -c2)"
+		search="$(echo "$info" |cut -d"$delim" -f2)"
+		fields="$(echo "$info" |cut -d"$delim" -f3)"
+		text="$(echo "$info" |cut -d"$delim" -f4-)"
+		echo "search is $search"
 		line="$(echo "$1" | grep "$search")"
 		
 		if [ -n "$line" ]; then
-			echo "[*]  ${red}${text}: $(echo "$line" | cut -d" " -f$fields)$der"
+			echo "[*]  ${blue}${text}: $(echo "$line" | cut -d" " -f$fields)$der"
 		fi
  	done < $2
 
@@ -124,6 +127,7 @@ function samba {
 	e4l="$(enum4linux $target 2>&1)"
 	echo "$e4l" > smb-enum4linux.txt
 	echo "[*]  ${green}Check enum4linux.txt${der}"
+	checkinfo "$e4l" "$info_samba"
 	## OS info 
 	os="$(echo "$e4l" |grep "Got OS info for $target from smbclient" |cut -d" " -f9-)"
 	if [ -n "$os" ]; then echo "[*]  ${red}$os${der}"; fi
@@ -135,7 +139,7 @@ function samba {
 	if [ -z "$vuln" ]; then 
 		echo "[*]  Nothing interesting noted (still check output)"
 	else
-		echo "[*]  ${red}$vuln${der}"
+		echo "[*]  ${blue}Possible vulnerabilities: $vuln${der}"
 	fi
 	echo "[*] Running nmap smb-os-discovery script"
 	v="$(nmap -p139,445 --script smb-os-discovery $target)"
@@ -145,7 +149,7 @@ function samba {
 	if [ -z "$os" ]; then
 		echo "[*] -Nothing interesting noted (but still check)"
 	else
-		echo "[*]${red}Possible vulnerabilites: $os${der}"
+		echo "[*]${red}$os${der}"
 	fi
 }
 
@@ -215,7 +219,7 @@ function single_module_udp {
 function port_open {
 
 	#allow empty ports to auto pass
-	if [ -z "$1" ]; then return 0; fi
+	if [ "$1" == "*" ]; then return 0; fi
 
 	o="$(nmap -p$1 -$2 $target | grep open)"
 
