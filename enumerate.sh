@@ -37,7 +37,7 @@ function ssh-creds {
 # generic hydra attack for credentials
 # $1 = protocol, $2 = users, $3 = passwords
 function hydra_attack {
-	echo "[*] Running hydra attack against $1 on $target with users:$2
+	echo "[*] Running hydra attack against $1 on $target with users:$2"
 	hydra -L $2 -P $3 $1://$target
 }
 
