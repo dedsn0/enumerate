@@ -7,16 +7,22 @@
 
 
 ## Services, ports and functions
-tcp_services=("SSH Known Credentials" "SSH Brute Force" "SMB/Samba")
-tcp_port=("22" "22" "139 445")
-tcp_enumeration=("ssh-known" "ssh-brute" "samba")
+tcp_services=("SSH Known Credentials" "SSH Brute Force" "SMB/Samba" "Nmap TCP Top 200")
+tcp_port=("22" "22" "139 445" "")
+tcp_enumeration=("ssh-known" "ssh-brute" "samba" "nmap-tcp-200")
 
+udp_services=("SNMP")
+udp_port=("161")
+udp_enumeration=("snmp")
 
-default_modules="ssh-known samba"
+default_modules="ssh-known samba nmap-tcp-200 snmp"
 
 found_users=/root/lists/users.txt
 found_passwords=/root/lists/pass-reuse.txt
 brute_passwords=/usr/share/wordlists/rockyou.txt
+
+#snmp_community=/root/lists/snmp-community.txt
+
 
 red="$(tput setaf 1)"
 green="$(tput setaf 2)"
@@ -33,6 +39,42 @@ echo "==- ${green}Enumeration by ${red}ded_sn0${der} -=="
 #
 #
 #########################################################################
+
+
+function snmp {
+	echo "[*] Running snmpwalk against v1 SNMP"
+	if (dosnmpwalk 1); then
+		echo "[*] v1 SNMP failed, so trying v2"
+		if (dosnmpwalk 2); then 
+			echo "[*] v2 also failed (may be v3)"
+		else 
+			checksnmp 2
+		fi
+	else
+		checksnmp 1
+	fi 
+
+}
+
+function checksnmp {
+	echo "checking v$1"
+}
+
+function dosnmpwalk {
+	report=$(snmpwalk -v $1 -c public $target)
+	if [ "$report" -eq  "snmpwalk: Timeout" ]; then
+		return 1
+	else
+		echo "[*]  ${green}Check snmpwalk-$1.txt"
+		echo "$report" > snmpwalk-$1.txt
+		return 0
+	fi
+}
+
+function nmap-tcp-200 {
+	nmap --top-ports 200 -sV --open $target > nmap-tcp-200.txt
+	echo "[*]  ${green}Check nmap-tcp-200.txt for port scan${der}"
+}
 
 function ssh-known {
 	hydra_attack ssh $found_users $found_passwords
@@ -58,7 +100,7 @@ function hydra_attack {
 		echo "[*}  ${red}Found $n valid credentials for $1${der}"
 		fi
 	fi
-	echo "$report" > hydra-known-passwords.txt
+	echo "$report" >> hydra-$1.txt
 
 	
 }
@@ -125,8 +167,8 @@ function single_module {
 	#find index for module
 	index="$(indexof tcp_enumeration[@] $1)"
 	if [ -z "$index" ]; then
-		echo "[*] ${red}Unknown module: $1${der}"
-		exit 1
+		single_module_udp $1
+		exit 10
 	fi
 
         ports="${tcp_port[$index]}"
@@ -137,10 +179,30 @@ function single_module {
 }
 
 
+function single_module_udp {
+        #find index for module
+        index="$(indexof udp_enumeration[@] $1)"
+        if [ -z "$index" ]; then
+                echo "[*] ${red}Unknown module: $1${der}"
+                exit 1
+        fi
+
+        ports="${udp_port[$index]}"
+        service="${udp_services[$index]}"
+
+
+        enumerate_service "$service" "$ports" sU $1 
+}
+
+
+
 #
 # Function to check a port is open in a scan
 # $1 is the port and $2 is the scan type
 function port_open {
+
+	#allow empty ports to auto pass
+	if [ -z "$1" ]; then return 0; fi
 
 	o="$(nmap -p$1 -$2 $target | grep open)"
 
@@ -227,6 +289,7 @@ if [ -z "$module" ]; then
 	## run all modules
 	##
 	echo "[*] Running all default modules"
+	echo "[*} Running TCP modules"
 	index=0
 	for service in ${tcp_enumeration[@]}; do
 		if [[ $default_modules == *$service* ]]; then 
@@ -238,6 +301,20 @@ if [ -z "$module" ]; then
 		fi
 		index=$(($index + 1))
 	done
+
+        echo "[*} Running UDP modules"
+        index=0
+        for service in ${udp_enumeration[@]}; do
+                if [[ $default_modules == *$service* ]]; then 
+                        ports="${udp_port[$index]}"
+                        service="${udp_services[$index]}"
+                        funct="${udp_enumeration[$index]}"
+
+                        enumerate_service "$service" "$ports" sU "$funct"
+                fi
+                index=$(($index + 1))
+        done
+
 else
 	echo "[*] Running $module module"
 	single_module $module
